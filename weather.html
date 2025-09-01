@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Weather App</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
+body{height:100vh;display:flex;justify-content:center;align-items:center;background:#222;color:#fff;transition:0.5s;background-size:cover;background-position:center}
+.container{background:rgba(0,0,0,0.5);padding:20px 25px;border-radius:15px;width:340px;text-align:center;backdrop-filter:blur(8px)}
+h2{margin-bottom:10px}
+input{width:70%;padding:8px;border:none;border-radius:8px;margin-bottom:10px}
+button{padding:8px 12px;border:none;border-radius:8px;background:#4a90e2;color:#fff;cursor:pointer;margin:4px}
+button:hover{background:#357ABD}
+.clock{font-size:14px;margin-bottom:10px;color:#ffda79}
+.icon{width:90px;height:90px}
+.temp{font-size:40px;font-weight:bold;margin:5px 0}
+.info{font-size:15px;margin-bottom:10px}
+.bottom{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:13px}
+.bottom div{background:rgba(255,255,255,0.15);padding:6px;border-radius:8px}
+</style>
+</head>
+<body id="bg">
+<div class="container">
+  <div id="clock" class="clock"></div>
+  <h2>🌦 Weather App</h2>
+  <input id="city" placeholder="Enter city">
+  <button onclick="getWeather()">Search</button>
+  <button onclick="getLocation()">📍</button>
+  <div id="result"></div>
+</div>
+
+<script>
+const key="bf5607ca41cbe3e3deb3ba0dc9777ed9"; 
+let lastCity="",lastCoords=null,timezone=0,sunrise=0,sunset=0;
+
+function getWeather(){
+  let c=document.getElementById("city").value;if(!c)return;
+  lastCity=c;lastCoords=null;
+  fetch(`https://api.openweathermap.org/data/2.5/weather?q=${c}&units=metric&appid=${key}`)
+  .then(r=>r.json()).then(d=>show(d));
+}
+
+function getLocation(){
+  navigator.geolocation.getCurrentPosition(p=>{
+    lastCoords={lat:p.coords.latitude,lon:p.coords.longitude};lastCity="";
+    fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${p.coords.latitude}&lon=${p.coords.longitude}&units=metric&appid=${key}`)
+    .then(r=>r.json()).then(d=>show(d));
+  });
+}
+
+function refresh(){
+  if(lastCity)getWeather();
+  else if(lastCoords){
+    fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lastCoords.lat}&lon=${lastCoords.lon}&units=metric&appid=${key}`)
+    .then(r=>r.json()).then(d=>show(d));
+  }
+}
+
+function setBackground(weather,isDay){
+  let bg=document.getElementById("bg");
+  if(!isDay) bg.style.background="url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1350&q=80')";
+  else if(weather=="Clear") bg.style.background="url('https://images.unsplash.com/photo-1501973801540-537f08ccae7b?auto=format&fit=crop&w=1350&q=80')";
+  else if(weather=="Clouds") bg.style.background="url('https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1350&q=80')";
+  else if(weather=="Rain") bg.style.background="url('https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&w=1350&q=80')";
+  else if(weather=="Snow") bg.style.background="url('https://images.unsplash.com/photo-1608889175356-0a8cb4b4a17c?auto=format&fit=crop&w=1350&q=80')";
+  else bg.style.background="url('https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=1350&q=80')";
+  bg.style.backgroundSize="cover";
+}
+
+function show(d){
+  let b=document.getElementById("result");
+  if(d.cod!=200){b.innerHTML="<p>City not found</p>";return;}
+  timezone=d.timezone;sunrise=d.sys.sunrise;sunset=d.sys.sunset;
+  let nowUTC=Math.floor(Date.now()/1000)+new Date().getTimezoneOffset()*60;
+  let localTS=nowUTC+timezone;let isDay=localTS>sunrise && localTS<sunset;
+  setBackground(d.weather[0].main,isDay);
+  let icon=`http://openweathermap.org/img/wn/${d.weather[0].icon}@2x.png`;
+  let sr=new Date(sunrise*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  let ss=new Date(sunset*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  b.innerHTML=`<img src="${icon}" class="icon"><div class="temp">${d.main.temp}°C</div>
+  <div>${d.weather[0].description} ${isDay?"🌞":"🌙"}</div>
+  <div class="info">${d.name}, ${d.sys.country}</div>
+  <div class="bottom">
+    <div>🌡 Feels: ${d.main.feels_like}°C</div>
+    <div>💧 Humidity: ${d.main.humidity}%</div>
+    <div>🍃 Wind: ${d.wind.speed} m/s</div>
+    <div>🌍 Pressure: ${d.main.pressure} hPa</div>
+    <div>⬆️ Max: ${d.main.temp_max}°C</div>
+    <div>⬇️ Min: ${d.main.temp_min}°C</div>
+    <div>🌅 Sunrise: ${sr}</div>
+    <div>🌇 Sunset: ${ss}</div>
+  </div>`;
+}
+
+function updateClock(){
+  let now=new Date();let utc=now.getTime()+now.getTimezoneOffset()*60000;
+  let local=new Date(utc+timezone*1000);
+  document.getElementById("clock").innerText=local.toLocaleDateString()+" | "+local.toLocaleTimeString();
+}
+setInterval(updateClock,1000);updateClock();
+setInterval(refresh,600000);
+</script>
+</body>
+</html>
